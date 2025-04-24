@@ -1,0 +1,98 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- (c) Ivelosi Technologies. All Rights Reserved -->
+<androidx.constraintlayout.widget.ConstraintLayout
+    xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    xmlns:tools="http://schemas.android.com/tools"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    tools:context=".ui.ChatFragment">
+
+    <androidx.appcompat.widget.Toolbar
+        android:id="@+id/toolbar"
+        android:layout_width="0dp"
+        android:layout_height="?attr/actionBarSize"
+        android:background="?attr/colorPrimary"
+        android:elevation="4dp"
+        android:theme="@style/ThemeOverlay.MaterialComponents.Dark.ActionBar"
+        app:layout_constraintEnd_toEndOf="parent"
+        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintTop_toTopOf="parent"
+        app:popupTheme="@style/ThemeOverlay.MaterialComponents.Light">
+
+        <TextView
+            android:id="@+id/text_peer_name"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:textAppearance="@style/TextAppearance.MaterialComponents.Headline6"
+            android:textColor="@android:color/white"
+            tools:text="Unknown Device" />
+
+    </androidx.appcompat.widget.Toolbar>
+
+    <androidx.recyclerview.widget.RecyclerView
+        android:id="@+id/recycler_messages"
+        android:layout_width="0dp"
+        android:layout_height="0dp"
+        android:clipToPadding="false"
+        android:paddingTop="8dp"
+        android:paddingBottom="8dp"
+        app:layout_constraintBottom_toTopOf="@+id/input_layout"
+        app:layout_constraintEnd_toEndOf="parent"
+        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintTop_toBottomOf="@+id/toolbar"
+        tools:listitem="@layout/item_message" />
+
+    <LinearLayout
+        android:id="@+id/input_layout"
+        android:layout_width="0dp"
+        android:layout_height="wrap_content"
+        android:background="?android:attr/windowBackground"
+        android:elevation="4dp"
+        android:orientation="horizontal"
+        android:padding="8dp"
+        app:layout_constraintBottom_toBottomOf="parent"
+        app:layout_constraintEnd_toEndOf="parent"
+        app:layout_constraintStart_toStartOf="parent">
+
+        <com.google.android.material.textfield.TextInputLayout
+            android:id="@+id/message_input_layout"
+            style="@style/Widget.MaterialComponents.TextInputLayout.OutlinedBox"
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:hint="Type a message...">
+
+            <com.google.android.material.textfield.TextInputEditText
+                android:id="@+id/edit_message"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:inputType="textMultiLine"
+                android:maxLines="4" />
+
+        </com.google.android.material.textfield.TextInputLayout>
+
+        <com.google.android.material.button.MaterialButton
+            android:id="@+id/button_send"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_gravity="bottom"
+            android:layout_marginStart="8dp"
+            android:text="Send"
+            app:icon="@drawable/ic_send" />
+
+    </LinearLayout>
+
+    <TextView
+        android:id="@+id/text_empty"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:text="No messages yet.\nStart chatting!"
+        android:textAlignment="center"
+        android:visibility="gone"
+        app:layout_constraintBottom_toTopOf="@+id/input_layout"
+        app:layout_constraintEnd_toEndOf="parent"
+        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintTop_toBottomOf="@+id/toolbar" />
+
+</androidx.constraintlayout.widget.ConstraintLayout>

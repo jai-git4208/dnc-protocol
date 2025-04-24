@@ -1,0 +1,37 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- (c) Ivelosi Technologies. All Rights Reserved -->
+<navigation xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    xmlns:tools="http://schemas.android.com/tools"
+    android:id="@+id/nav_graph"
+    app:startDestination="@id/peersFragment">
+
+    <fragment
+        android:id="@+id/peersFragment"
+        android:name="com.ivelosi.dncprotocol.ui.PeersFragment"
+        android:label="Peers"
+        tools:layout="@layout/fragment_peers">
+        <action
+            android:id="@+id/action_peersFragment_to_chatFragment"
+            app:destination="@id/chatFragment" />
+    </fragment>
+
+    <fragment
+        android:id="@+id/chatFragment"
+        android:name="com.ivelosi.dncprotocol.ui.ChatFragment"
+        android:label="Chat"
+        tools:layout="@layout/fragment_chat">
+        <argument
+            android:name="peerId"
+            app:argType="string" />
+        <argument
+            android:name="peerName"
+            app:argType="string" />
+    </fragment>
+
+    <fragment
+        android:id="@+id/settingsFragment"
+        android:name="com.ivelosi.dncprotocol.ui.SettingsFragment"
+        android:label="Settings"
+        tools:layout="@layout/fragment_settings" />
+</navigation>

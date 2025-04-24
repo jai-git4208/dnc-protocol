@@ -1,0 +1,132 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- (c) Ivelosi Technologies. All Rights Reserved -->
+<androidx.constraintlayout.widget.ConstraintLayout
+    xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    xmlns:tools="http://schemas.android.com/tools"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    tools:context=".ui.SettingsFragment">
+
+    <TextView
+        android:id="@+id/text_header"
+        android:layout_width="0dp"
+        android:layout_height="wrap_content"
+        android:layout_marginStart="16dp"
+        android:layout_marginTop="16dp"
+        android:layout_marginEnd="16dp"
+        android:text="Settings"
+        android:textAppearance="@style/TextAppearance.MaterialComponents.Headline5"
+        app:layout_constraintEnd_toEndOf="parent"
+        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintTop_toTopOf="parent" />
+
+    <com.google.android.material.card.MaterialCardView
+        android:id="@+id/card_user_info"
+        android:layout_width="0dp"
+        android:layout_height="wrap_content"
+        android:layout_margin="16dp"
+        app:cardCornerRadius="8dp"
+        app:cardElevation="4dp"
+        app:layout_constraintEnd_toEndOf="parent"
+        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintTop_toBottomOf="@+id/text_header">
+
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="vertical"
+            android:padding="16dp">
+
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="Your Profile"
+                android:textAppearance="@style/TextAppearance.MaterialComponents.Subtitle1"
+                android:textStyle="bold" />
+
+            <com.google.android.material.textfield.TextInputLayout
+                android:id="@+id/input_display_name"
+                style="@style/Widget.MaterialComponents.TextInputLayout.OutlinedBox"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="16dp"
+                android:hint="Display Name">
+
+                <com.google.android.material.textfield.TextInputEditText
+                    android:id="@+id/edit_display_name"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:inputType="textPersonName" />
+
+            </com.google.android.material.textfield.TextInputLayout>
+
+            <com.google.android.material.button.MaterialButton
+                android:id="@+id/button_save_name"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_gravity="end"
+                android:layout_marginTop="8dp"
+                android:text="Save" />
+
+        </LinearLayout>
+    </com.google.android.material.card.MaterialCardView>
+
+    <com.google.android.material.card.MaterialCardView
+        android:id="@+id/card_connectivity"
+        android:layout_width="0dp"
+        android:layout_height="wrap_content"
+        android:layout_margin="16dp"
+        app:cardCornerRadius="8dp"
+        app:cardElevation="4dp"
+        app:layout_constraintEnd_toEndOf="parent"
+        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintTop_toBottomOf="@+id/card_user_info">
+
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="vertical"
+            android:padding="16dp">
+
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="Connectivity"
+                android:textAppearance="@style/TextAppearance.MaterialComponents.Subtitle1"
+                android:textStyle="bold" />
+
+            <com.google.android.material.switchmaterial.SwitchMaterial
+                android:id="@+id/switch_wifi_aware"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="16dp"
+                android:checked="true"
+                android:text="Enable Wi-Fi Aware" />
+
+            <TextView
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginStart="48dp"
+                android:text="Enables high-speed direct communication with nearby devices"
+                android:textAppearance="@style/TextAppearance.MaterialComponents.Caption" />
+
+            <com.google.android.material.switchmaterial.SwitchMaterial
+                android:id="@+id/switch_bluetooth"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="16dp"
+                android:checked="true"
+                android:text="Enable Bluetooth LE" />
+
+            <TextView
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginStart="48dp"
+                android:text="Used for initial discovery and connection handshaking"
+                android:textAppearance="@style/TextAppearance.MaterialComponents.Caption" />
+
+        </LinearLayout>
+    </com.google.android.material.card.MaterialCardView>
+
+</androidx.constraintlayout.widget.ConstraintLayout>

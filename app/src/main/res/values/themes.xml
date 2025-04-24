@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <style name="Theme.Wifiaware" parent="Theme.MaterialComponents.Light.NoActionBar">
+        <!-- More theme attributes here -->
+    </style>
+
+    <!-- Dark Theme -->
+    <style name="AppTheme" parent="Theme.Material3.DayNight">
+        <!-- More theme attributes here -->
+    </style>
+</resources>

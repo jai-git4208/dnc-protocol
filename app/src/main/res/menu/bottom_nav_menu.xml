@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- (c) Ivelosi Technologies. All Rights Reserved -->
+<menu xmlns:android="http://schemas.android.com/apk/res/android">
+    <item
+        android:id="@+id/peersFragment"
+        android:icon="@drawable/ic_people"
+        android:title="Peers" />
+    <item
+        android:id="@+id/settingsFragment"
+        android:icon="@drawable/ic_settings"
+        android:title="Settings" />
+</menu>

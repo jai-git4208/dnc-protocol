@@ -1,0 +1,63 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- (c) Ivelosi Technologies. All Rights Reserved -->
+<com.google.android.material.card.MaterialCardView
+    xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    android:layout_width="match_parent"
+    android:layout_height="wrap_content"
+    android:layout_margin="8dp"
+    app:cardCornerRadius="8dp"
+    app:cardElevation="4dp">
+
+    <androidx.constraintlayout.widget.ConstraintLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:padding="16dp">
+
+        <ImageView
+            android:id="@+id/image_peer"
+            android:layout_width="48dp"
+            android:layout_height="48dp"
+            android:contentDescription="Peer avatar"
+            android:src="@drawable/ic_person"
+            app:layout_constraintBottom_toBottomOf="parent"
+            app:layout_constraintStart_toStartOf="parent"
+            app:layout_constraintTop_toTopOf="parent" />
+
+        <TextView
+            android:id="@+id/text_peer_name"
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_marginStart="16dp"
+            android:text="Unknown Device"
+            android:textAppearance="@style/TextAppearance.MaterialComponents.Body1"
+            android:textStyle="bold"
+            app:layout_constraintEnd_toEndOf="parent"
+            app:layout_constraintStart_toEndOf="@+id/image_peer"
+            app:layout_constraintTop_toTopOf="@+id/image_peer" />
+
+        <TextView
+            android:id="@+id/text_peer_id"
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_marginStart="16dp"
+            android:text="peer-123456"
+            android:textAppearance="@style/TextAppearance.MaterialComponents.Caption"
+            app:layout_constraintEnd_toEndOf="parent"
+            app:layout_constraintStart_toEndOf="@+id/image_peer"
+            app:layout_constraintTop_toBottomOf="@+id/text_peer_name" />
+
+        <TextView
+            android:id="@+id/text_connection_type"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginStart="16dp"
+            android:layout_marginTop="4dp"
+            android:text="WiFi Aware"
+            android:textAppearance="@style/TextAppearance.MaterialComponents.Caption"
+            android:textColor="@color/design_default_color_primary"
+            app:layout_constraintStart_toEndOf="@+id/image_peer"
+            app:layout_constraintTop_toBottomOf="@+id/text_peer_id" />
+
+    </androidx.constraintlayout.widget.ConstraintLayout>
+</com.google.android.material.card.MaterialCardView>
