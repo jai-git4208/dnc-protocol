@@ -1,6 +1,10 @@
 package com.ivelosi.dnc.network
 
 /**
+ * (c)Ivelosi Technologies. All Rights Reserved.
+ */
+
+/**
  * Protocol definition for messages exchanged between devices
  */
 object MessageProtocol {

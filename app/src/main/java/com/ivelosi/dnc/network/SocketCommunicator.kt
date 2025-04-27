@@ -1,5 +1,9 @@
 package com.ivelosi.dnc.network
 
+/**
+ * (c)Ivelosi Technologies. All Rights Reserved.
+ */
+
 import kotlinx.coroutines.*
 import java.io.BufferedReader
 import java.io.InputStreamReader

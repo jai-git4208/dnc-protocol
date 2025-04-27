@@ -1,5 +1,9 @@
 package com.ivelosi.dnc.network
 
+/**
+ * (c)Ivelosi Technologies. All Rights Reserved.
+ */
+
 // Data class to hold device information
 data class BluetoothDeviceInfo(
     val name: String,

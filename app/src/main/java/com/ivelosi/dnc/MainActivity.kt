@@ -1,5 +1,9 @@
 package com.ivelosi.dnc
 
+/**
+ * (c)Ivelosi Technologies. All Rights Reserved.
+ */
+
 import android.Manifest
 import android.annotation.SuppressLint
 import android.bluetooth.BluetoothAdapter

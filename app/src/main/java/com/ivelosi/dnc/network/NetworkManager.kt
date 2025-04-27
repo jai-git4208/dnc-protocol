@@ -1,5 +1,9 @@
 package com.ivelosi.dnc.network
 
+/**
+ * (c)Ivelosi Technologies. All Rights Reserved.
+ */
+
 import android.util.Log
 import kotlinx.coroutines.*
 import java.io.BufferedReader

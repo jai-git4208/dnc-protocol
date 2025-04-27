@@ -1,5 +1,9 @@
 package com.ivelosi.dnc.network
 
+/**
+ * (c)Ivelosi Technologies. All Rights Reserved.
+ */
+
 import android.net.wifi.WifiManager
 import java.util.regex.Pattern
 

@@ -1,5 +1,9 @@
 package com.ivelosi.dnc.network
 
+/**
+ * (c)Ivelosi Technologies. All Rights Reserved.
+ */
+
 import android.content.Context
 import android.os.Environment
 import android.util.Base64

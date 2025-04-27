@@ -1,5 +1,9 @@
 package com.ivelosi.dnc.ui
 
+/**
+ * (c)Ivelosi Technologies. All Rights Reserved.
+ */
+
 import android.app.Activity
 import android.app.AlertDialog
 import android.content.Intent
