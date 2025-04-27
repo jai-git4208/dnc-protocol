@@ -1,18 +1,20 @@
-package com.ivelosi.dnc.network
-
-/**
- * (c)Ivelosi Technologies. All Rights Reserved.
- */
+package com.ivelosi.dnc.signal
 
 import android.content.Context
 import android.os.Environment
 import android.util.Base64
+import com.ivelosi.dnc.network.BluetoothDeviceInfo
+import com.ivelosi.dnc.network.NetworkLogger
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import java.io.File
 import java.io.FileOutputStream
+
+/**
+ * (c)Ivelosi Technologies. All Rights Reserved.
+ */
 
 /**
  * Handles receiving and assembling files sent through the network

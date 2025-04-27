@@ -1,4 +1,4 @@
-package com.ivelosi.dnc.network
+package com.ivelosi.dnc.signal
 
 /**
  * (c)Ivelosi Technologies. All Rights Reserved.

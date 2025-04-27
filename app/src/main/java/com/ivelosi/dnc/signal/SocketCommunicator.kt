@@ -1,15 +1,21 @@
-package com.ivelosi.dnc.network
+package com.ivelosi.dnc.signal
 
-/**
- * (c)Ivelosi Technologies. All Rights Reserved.
- */
-
-import kotlinx.coroutines.*
+import android.util.Base64
+import com.ivelosi.dnc.network.BluetoothDeviceInfo
+import com.ivelosi.dnc.network.NetworkLogger
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.launch
 import java.io.BufferedReader
 import java.io.InputStreamReader
 import java.io.PrintWriter
 import java.net.Socket
 import java.util.concurrent.ConcurrentLinkedQueue
+
+/**
+ * (c)Ivelosi Technologies. All Rights Reserved.
+ */
 
 /**
  * Handles communication over an established socket connection
@@ -187,7 +193,7 @@ class SocketCommunicator(
                 while (offset < fileSize) {
                     val currentChunkSize = minOf(chunkSize, fileSize - offset)
                     val chunk = fileContent.copyOfRange(offset, offset + currentChunkSize)
-                    val base64Chunk = android.util.Base64.encodeToString(chunk, android.util.Base64.DEFAULT)
+                    val base64Chunk = Base64.encodeToString(chunk, Base64.DEFAULT)
 
                     sendMessage(MessageProtocol.TYPE_FILE_CHUNK, "$offset|$currentChunkSize|$base64Chunk")
                     offset += currentChunkSize

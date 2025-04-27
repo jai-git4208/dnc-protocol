@@ -6,12 +6,11 @@ package com.ivelosi.dnc.network
 
 import android.util.Log
 import kotlinx.coroutines.*
-import java.io.BufferedReader
-import java.io.InputStreamReader
-import java.io.PrintWriter
 import java.net.InetSocketAddress
 import java.net.Socket
 import android.os.Build
+import com.ivelosi.dnc.signal.MessageProtocol
+import com.ivelosi.dnc.signal.SocketCommunicator
 
 class NetworkManager(private val logger: NetworkLogger) {
     private val TAG = "DNCNetworkManager"

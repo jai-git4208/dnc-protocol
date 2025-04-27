@@ -1,7 +1,7 @@
 package com.ivelosi.dnc.ui
 
 /**
- * (c)Ivelosi Technologies. All Rights Reserved.
+ * (c) Ivelosi Technologies. All Rights Reserved.
  */
 
 import android.app.Activity
@@ -15,8 +15,8 @@ import android.widget.LinearLayout
 import android.widget.Toast
 import com.ivelosi.dnc.R
 import com.ivelosi.dnc.network.BluetoothDeviceInfo
-import com.ivelosi.dnc.network.FileReceiver
-import com.ivelosi.dnc.network.MessageProtocol
+import com.ivelosi.dnc.signal.FileReceiver
+import com.ivelosi.dnc.signal.MessageProtocol
 import com.ivelosi.dnc.network.NetworkLogger
 import com.ivelosi.dnc.network.NetworkManager
 import kotlinx.coroutines.CoroutineScope

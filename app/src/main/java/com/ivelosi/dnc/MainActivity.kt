@@ -37,6 +37,7 @@ import com.ivelosi.dnc.network.BluetoothDeviceInfo
 import com.ivelosi.dnc.network.NetworkLogger
 import com.ivelosi.dnc.network.NetworkManager
 import com.ivelosi.dnc.network.WifiUtils
+import com.ivelosi.dnc.signal.DNCPrefixValidator
 import kotlinx.coroutines.*
 import java.text.SimpleDateFormat
 import java.util.*
@@ -59,7 +60,6 @@ class MainActivity : AppCompatActivity(), NetworkLogger {
     private var selectedDevice: BluetoothDeviceInfo? = null
 
     private val TAG = "DNCScannerApp"
-    private val DNC_PREFIX = "DNC-"
     private val coroutineScope = CoroutineScope(Dispatchers.Main + SupervisorJob())
 
     private val requestMultiplePermissions = registerForActivityResult(
@@ -209,7 +209,9 @@ class MainActivity : AppCompatActivity(), NetworkLogger {
 
     private fun setDeviceName() {
         try {
-            val deviceName = "DNC-User"
+            // Get the default prefix from validator
+            val defaultPrefix = DNCPrefixValidator.getValidPrefixes().first() // Gets "DNC-" by default
+            val deviceName = "${defaultPrefix}User"
             log("Attempting to set device name to: $deviceName")
 
             // For modern Android versions, this is typically not allowed programmatically
@@ -242,7 +244,7 @@ class MainActivity : AppCompatActivity(), NetworkLogger {
                 }
 
                 BluetoothAdapter.ACTION_DISCOVERY_FINISHED -> {
-                    log("Discovery finished. Found ${discoveredDevices.size} DNC devices")
+                    log("Discovery finished. Found ${discoveredDevices.size} compatible devices")
                 }
 
                 BluetoothDevice.ACTION_FOUND -> {
@@ -261,9 +263,10 @@ class MainActivity : AppCompatActivity(), NetworkLogger {
 
                                 log("Found device: $deviceName ($deviceAddress)")
 
-                                // Filter for DNC- prefix
-                                if (deviceName.startsWith(DNC_PREFIX)) {
-                                    log("DNC device found: $deviceName")
+                                // Filter using DNCPrefixValidator
+                                if (DNCPrefixValidator.hasValidPrefix(deviceName)) {
+                                    val matchingPrefix = DNCPrefixValidator.getMatchingPrefix(deviceName)
+                                    log("Compatible device found with prefix '$matchingPrefix': $deviceName")
 
                                     // Get WiFi information
                                     val wifiInfo = WifiUtils.getWifiInfo(wifiManager)
