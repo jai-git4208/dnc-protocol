@@ -1,7 +1,7 @@
-# DNC (Device Network Communication)
+# DNC (Decentralized N2N Communication)
 
 ## Overview
-DNC (Device Network Communication) is an Android application that enables secure device-to-device communication using a combination of Bluetooth for discovery and WiFi for data transmission. It allows seamless file transfers, text messaging, and remote command execution between compatible Android devices on the same network.
+DNC (Decentralized N2N Communication) is an Android application that enables secure device-to-device communication using a combination of Bluetooth for discovery and WiFi for data transmission. It allows seamless file transfers, text messaging, and remote command execution between compatible Android devices on the same network.
 
 ## Features
 - Bluetooth device discovery with DNC-prefix filtering
