@@ -11,6 +11,7 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import java.io.File
 import java.io.FileOutputStream
+import com.ivelosi.dnc.notification.DNCNotificationManager
 
 /**
  * (c)Ivelosi Technologies. All Rights Reserved.
@@ -26,6 +27,9 @@ class FileReceiver(
 ) {
     // Store file transfer state
     private val fileTransfers = mutableMapOf<String, FileTransferState>()
+    
+    // Add notification manager
+    private val notificationManager = DNCNotificationManager(context)
 
     /**
      * Process a file-related message
@@ -70,6 +74,11 @@ class FileReceiver(
             fileTransfers[transferId] = transferState
 
             logger.log("Starting file transfer: $fileName (${formatFileSize(fileSize)}) from ${from.name}")
+            
+            // Send notification about file transfer starting
+            notificationManager.showDiscoveryNotification(
+                "Starting file transfer: $fileName (${formatFileSize(fileSize)}) from ${from.name}"
+            )
         } catch (e: Exception) {
             logger.log("Error processing file start: ${e.message}")
         }
@@ -105,8 +114,15 @@ class FileReceiver(
 
             // Log progress periodically
             val progress = (transferState.receivedBytes.toFloat() / transferState.fileSize) * 100
-            if (progress % 10 < 1 || transferState.receivedBytes == transferState.fileSize) {
+            if (progress % 25 < 1 || transferState.receivedBytes == transferState.fileSize) {
                 logger.log("File transfer progress: ${progress.toInt()}% (${formatFileSize(transferState.receivedBytes)}/${formatFileSize(transferState.fileSize)})")
+                
+                // Only update notification at significant progress points (25%, 50%, 75%, 100%)
+                if (progress % 25 < 1) {
+                    notificationManager.showDiscoveryNotification(
+                        "File transfer from ${from.name}: ${progress.toInt()}% complete"
+                    )
+                }
             }
         } catch (e: Exception) {
             logger.log("Error processing file chunk: ${e.message}")
@@ -128,13 +144,23 @@ class FileReceiver(
             // Save the complete file
             coroutineScope.launch {
                 try {
-                    saveReceivedFile(from, transferState)
+                    val savedFilePath = saveReceivedFile(from, transferState)
                     withContext(Dispatchers.Main) {
                         logger.log("File transfer complete: ${transferState.fileName} from ${from.name}")
+                        
+                        // Send notification about completed file with path
+                        notificationManager.showDiscoveryNotification(
+                            "File received: ${transferState.fileName} from ${from.name}"
+                        )
                     }
                 } catch (e: Exception) {
                     withContext(Dispatchers.Main) {
                         logger.log("Error saving file: ${e.message}")
+                        
+                        // Notify about error
+                        notificationManager.showDiscoveryNotification(
+                            "Error saving file from ${from.name}: ${e.message}"
+                        )
                     }
                 } finally {
                     // Clean up the transfer state
@@ -149,8 +175,8 @@ class FileReceiver(
     /**
      * Save the received file to storage
      */
-    private suspend fun saveReceivedFile(from: BluetoothDeviceInfo, transferState: FileTransferState) {
-        withContext(Dispatchers.IO) {
+    private suspend fun saveReceivedFile(from: BluetoothDeviceInfo, transferState: FileTransferState): String {
+        return withContext(Dispatchers.IO) {
             try {
                 // Create downloads directory if it doesn't exist
                 val downloadsDir = File(
@@ -177,6 +203,7 @@ class FileReceiver(
                 }
 
                 logger.log("File saved to: ${outputFile.absolutePath}")
+                outputFile.absolutePath
             } catch (e: Exception) {
                 logger.log("Error saving file: ${e.message}")
                 throw e

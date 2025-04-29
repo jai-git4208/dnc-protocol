@@ -1,5 +1,6 @@
 package com.ivelosi.dnc.signal
 
+import android.content.Context
 import android.util.Base64
 import com.ivelosi.dnc.network.BluetoothDeviceInfo
 import com.ivelosi.dnc.network.NetworkLogger
@@ -12,6 +13,7 @@ import java.io.InputStreamReader
 import java.io.PrintWriter
 import java.net.Socket
 import java.util.concurrent.ConcurrentLinkedQueue
+import com.ivelosi.dnc.notification.DNCNotificationManager
 
 /**
  * (c)Ivelosi Technologies. All Rights Reserved.
@@ -26,12 +28,16 @@ class SocketCommunicator(
     private val logger: NetworkLogger,
     private val scope: CoroutineScope,
     private val onMessageReceived: (BluetoothDeviceInfo, String, String) -> Unit,
-    private val onDisconnect: (BluetoothDeviceInfo) -> Unit
+    private val onDisconnect: (BluetoothDeviceInfo) -> Unit,
+    private val context: Context
 ) {
     private var writer: PrintWriter? = null
     private var reader: BufferedReader? = null
     private val messageQueue = ConcurrentLinkedQueue<String>()
     private var isRunning = true
+
+    // Add notification manager
+    private val notificationManager = DNCNotificationManager(context)
 
     init {
         try {
@@ -39,8 +45,12 @@ class SocketCommunicator(
             reader = BufferedReader(InputStreamReader(socket.getInputStream()))
             startReceiving()
             startSending()
+            
+            // Send notification when connection is initialized
+            notificationManager.showDiscoveryNotification("Connected to ${deviceInfo.name}")
         } catch (e: Exception) {
             logger.log("Error initializing communicator for ${deviceInfo.name}: ${e.message}")
+            notificationManager.showDiscoveryNotification("Failed to connect to ${deviceInfo.name}: ${e.message}")
             close()
         }
     }
@@ -52,6 +62,24 @@ class SocketCommunicator(
         val message = MessageProtocol.createMessage(type, payload)
         messageQueue.add(message)
         logger.log("Queued message to ${deviceInfo.name}: $type")
+        
+        // Only notify for significant message types
+        when (type) {
+            MessageProtocol.TYPE_FILE_START -> {
+                val parts = payload.split("|", limit = 2)
+                if (parts.size == 2) {
+                    val fileName = parts[0]
+                    notificationManager.showDiscoveryNotification(
+                        "Started sending file: $fileName to ${deviceInfo.name}"
+                    )
+                }
+            }
+            MessageProtocol.TYPE_FILE_END -> {
+                notificationManager.showDiscoveryNotification(
+                    "Completed sending file to ${deviceInfo.name}"
+                )
+            }
+        }
     }
 
     /**
@@ -67,6 +95,15 @@ class SocketCommunicator(
     fun sendCommand(command: String, args: String = "") {
         val payload = if (args.isEmpty()) command else "$command:$args"
         sendMessage(MessageProtocol.TYPE_COMMAND, payload)
+        
+        // Notify for important commands
+        when (command) {
+            MessageProtocol.CMD_RESTART, MessageProtocol.CMD_SHUTDOWN -> {
+                notificationManager.showDiscoveryNotification(
+                    "Sent $command command to ${deviceInfo.name}"
+                )
+            }
+        }
     }
 
     /**
@@ -139,6 +176,29 @@ class SocketCommunicator(
                 MessageProtocol.TYPE_HANDSHAKE -> {
                     // Send handshake response if needed
                     sendMessage(MessageProtocol.TYPE_HANDSHAKE, "ACCEPTED")
+                    notificationManager.showDiscoveryNotification(
+                        "Connection handshake completed with ${deviceInfo.name}"
+                    )
+                }
+                MessageProtocol.TYPE_TEXT -> {
+                    // Show notification for text messages
+                    notificationManager.showMessageNotification(deviceInfo.name, payload)
+                }
+                MessageProtocol.TYPE_FILE_START -> {
+                    // Show notification for file transfer beginning
+                    val parts = payload.split("|", limit = 2)
+                    if (parts.size == 2) {
+                        val fileName = parts[0]
+                        notificationManager.showDiscoveryNotification(
+                            "Receiving file: $fileName from ${deviceInfo.name}"
+                        )
+                    }
+                }
+                MessageProtocol.TYPE_FILE_END -> {
+                    // Show notification for file transfer completion
+                    notificationManager.showDiscoveryNotification(
+                        "File transfer complete from ${deviceInfo.name}"
+                    )
                 }
             }
 
@@ -165,6 +225,9 @@ class SocketCommunicator(
             if (!socket.isClosed) {
                 socket.close()
             }
+            
+            // Notify about disconnection
+            notificationManager.showDiscoveryNotification("Disconnected from ${deviceInfo.name}")
         } catch (e: Exception) {
             logger.log("Error closing communication with ${deviceInfo.name}: ${e.message}")
         }

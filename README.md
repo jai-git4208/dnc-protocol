@@ -78,8 +78,8 @@ Files are transferred in chunks and automatically saved to the device's Download
 
 - [x] **Layer 1: Signal Filtration**
   - [x] Implement DNC-Prefix validation for Bluetooth/WiFi signals
-  - [ ] Build adaptive scanning frequency algorithm
-  - [ ] Create energy-efficient signal processing
+  - [x] Build adaptive scanning frequency algorithm
+  - [x] Create energy-efficient signal processing
 
 - [ ] **Layer 2: NID System**
   - [ ] Develop 10-digit Node Identifier generation

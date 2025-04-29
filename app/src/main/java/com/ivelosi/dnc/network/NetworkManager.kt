@@ -9,15 +9,20 @@ import kotlinx.coroutines.*
 import java.net.InetSocketAddress
 import java.net.Socket
 import android.os.Build
+import android.content.Context
+import com.ivelosi.dnc.notification.DNCNotificationManager
 import com.ivelosi.dnc.signal.MessageProtocol
 import com.ivelosi.dnc.signal.SocketCommunicator
 
-class NetworkManager(private val logger: NetworkLogger) {
+class NetworkManager(private val context: Context, private val logger: NetworkLogger) {
     private val TAG = "DNCNetworkManager"
     private val DEFAULT_PORT = 8080 // Default socket port
     private val socketConnections = mutableMapOf<String, Socket>()
     private val communicators = mutableMapOf<String, SocketCommunicator>()
     private val coroutineScope = CoroutineScope(Dispatchers.IO + SupervisorJob())
+    
+    // Add notification manager
+    private val notificationManager = DNCNotificationManager(context)
 
     // Callback for received messages
     private var messageReceivedCallback: ((BluetoothDeviceInfo, String, String) -> Unit)? = null
@@ -39,6 +44,7 @@ class NetworkManager(private val logger: NetworkLogger) {
         // No IP address available
         if (device.ipAddress.isEmpty()) {
             logger.log("Cannot connect to ${device.name}: No IP address available")
+            notificationManager.showDiscoveryNotification("Cannot connect to ${device.name}: No IP address available")
             coroutineScope.launch {
                 onStatusUpdate(device, "Failed: No IP address", false)
             }
@@ -48,6 +54,7 @@ class NetworkManager(private val logger: NetworkLogger) {
         coroutineScope.launch {
             try {
                 logger.log("Connecting to ${device.name} at ${device.ipAddress}:$DEFAULT_PORT...")
+                notificationManager.showDiscoveryNotification("Connecting to ${device.name}...")
                 onStatusUpdate(device, "Connecting...", false)
 
                 val socket = Socket()
@@ -57,6 +64,7 @@ class NetworkManager(private val logger: NetworkLogger) {
                 if (socket.isConnected) {
                     socketConnections[device.address] = socket
                     logger.log("Connected successfully to ${device.name}")
+                    notificationManager.showDiscoveryNotification("Connected successfully to ${device.name}")
                     onStatusUpdate(device, "Connected", true)
 
                     // Create communicator for this connection
@@ -73,7 +81,8 @@ class NetworkManager(private val logger: NetworkLogger) {
                             coroutineScope.launch {
                                 onStatusUpdate(d, "Disconnected", false)
                             }
-                        }
+                        },
+                        context = context
                     )
                     communicators[device.address] = communicator
 
@@ -84,10 +93,12 @@ class NetworkManager(private val logger: NetworkLogger) {
                     )
                 } else {
                     logger.log("Failed to connect to ${device.name}")
+                    notificationManager.showDiscoveryNotification("Failed to connect to ${device.name}")
                     onStatusUpdate(device, "Connection failed", false)
                 }
             } catch (e: Exception) {
                 logger.log("Connection error with ${device.name}: ${e.message}")
+                notificationManager.showDiscoveryNotification("Connection error with ${device.name}: ${e.message}")
                 onStatusUpdate(device, "Error: ${e.message}", false)
             }
         }
@@ -104,12 +115,14 @@ class NetworkManager(private val logger: NetworkLogger) {
                 }
                 socketConnections.remove(device.address)
                 logger.log("Disconnected from ${device.name}")
+                notificationManager.showDiscoveryNotification("Disconnected from ${device.name}")
 
                 coroutineScope.launch {
                     onStatusUpdate(device, "Disconnected", false)
                 }
             } catch (e: Exception) {
                 logger.log("Error closing connection to ${device.name}: ${e.message}")
+                notificationManager.showDiscoveryNotification("Error disconnecting from ${device.name}: ${e.message}")
             }
         }
     }
@@ -121,6 +134,7 @@ class NetworkManager(private val logger: NetworkLogger) {
         communicators.remove(device.address)
         socketConnections.remove(device.address)
         logger.log("Device ${device.name} disconnected")
+        notificationManager.showDiscoveryNotification("Device ${device.name} disconnected")
     }
 
     /**
@@ -133,6 +147,7 @@ class NetworkManager(private val logger: NetworkLogger) {
             return true
         }
         logger.log("Cannot send message: Not connected to ${device.name}")
+        notificationManager.showDiscoveryNotification("Cannot send message: Not connected to ${device.name}")
         return false
     }
 
@@ -146,6 +161,7 @@ class NetworkManager(private val logger: NetworkLogger) {
             return true
         }
         logger.log("Cannot send command: Not connected to ${device.name}")
+        notificationManager.showDiscoveryNotification("Cannot send command: Not connected to ${device.name}")
         return false
     }
 
@@ -156,9 +172,11 @@ class NetworkManager(private val logger: NetworkLogger) {
         val communicator = communicators[device.address]
         if (communicator != null) {
             communicator.sendFile(fileName, fileContent)
+            notificationManager.showDiscoveryNotification("Started sending file: $fileName to ${device.name}")
             return true
         }
         logger.log("Cannot send file: Not connected to ${device.name}")
+        notificationManager.showDiscoveryNotification("Cannot send file: Not connected to ${device.name}")
         return false
     }
 
@@ -185,5 +203,6 @@ class NetworkManager(private val logger: NetworkLogger) {
         coroutineScope.cancel()
 
         logger.log("Network manager cleaned up")
+        notificationManager.showDiscoveryNotification("Network connections closed")
     }
 }
