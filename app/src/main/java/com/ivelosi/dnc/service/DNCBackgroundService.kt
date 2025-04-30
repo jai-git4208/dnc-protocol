@@ -13,7 +13,9 @@ import android.os.Binder
 import android.os.Build
 import android.os.IBinder
 import android.util.Log
+import com.ivelosi.dnc.bluetooth.BluetoothBroadcastManager
 import com.ivelosi.dnc.network.BluetoothDeviceInfo
+import com.ivelosi.dnc.network.DeviceNetworkInfo
 import com.ivelosi.dnc.network.NetworkLogger
 import com.ivelosi.dnc.network.NetworkManager
 import com.ivelosi.dnc.notification.DNCNotificationManager
@@ -47,6 +49,7 @@ class DNCBackgroundService : Service(), NetworkLogger {
     private lateinit var adaptiveScanningManager: AdaptiveScanningManager
     private lateinit var signalProcessor: EnergyEfficientSignalProcessor
     private lateinit var notificationManager: DNCNotificationManager
+    private lateinit var bluetoothBroadcastManager: BluetoothBroadcastManager
     
     // Status tracking
     private val discoveredDevices = mutableListOf<BluetoothDeviceInfo>()
@@ -64,6 +67,8 @@ class DNCBackgroundService : Service(), NetworkLogger {
     // Callback interfaces
     private var onDevicesUpdatedListener: ((List<BluetoothDeviceInfo>) -> Unit)? = null
     private var onLogMessageListener: ((String) -> Unit)? = null
+    private var onConnectionStatusListener: ((BluetoothDeviceInfo, String, Boolean) -> Unit)? = null
+    private var onNetworkInfoUpdatedListener: ((String) -> Unit)? = null
     
     /**
      * Local binder class
@@ -86,6 +91,21 @@ class DNCBackgroundService : Service(), NetworkLogger {
         adaptiveScanningManager = AdaptiveScanningManager(this, bluetoothAdapter, this)
         signalProcessor = EnergyEfficientSignalProcessor(this, wifiManager, this)
         
+        // Initialize the new BluetoothBroadcastManager
+        bluetoothBroadcastManager = BluetoothBroadcastManager(this, bluetoothAdapter, this)
+        bluetoothBroadcastManager.setOnDevicesUpdatedListener { devices ->
+            // Update our device list with the new discovered devices
+            discoveredDevices.clear()
+            discoveredDevices.addAll(devices)
+            
+            // Notify listeners about updated device list
+            onDevicesUpdatedListener?.invoke(discoveredDevices)
+            
+            // Update scanning status
+            isScanning = bluetoothBroadcastManager.isActivelyScanning()
+            updateServiceNotification()
+        }
+        
         // Setup notification manager
         notificationManager = DNCNotificationManager(this)
         notificationManager.createNotificationChannels()
@@ -96,13 +116,20 @@ class DNCBackgroundService : Service(), NetworkLogger {
             notificationManager.createServiceNotification()
         )
         
-        // Register broadcast receivers
-        registerReceivers()
+        // Register service action receiver
+        val serviceFilter = IntentFilter().apply {
+            addAction(DNCNotificationManager.ACTION_STOP_SERVICE)
+            addAction(DNCNotificationManager.ACTION_SCAN_DEVICES)
+        }
+        registerReceiver(serviceActionReceiver, serviceFilter)
         
         // Set up message listener
         networkManager.setOnMessageReceivedListener { device, type, payload ->
             handleReceivedMessage(device, type, payload)
         }
+        
+        // Start monitoring network conditions periodically
+        startNetworkMonitoring()
     }
     
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
@@ -128,27 +155,7 @@ class DNCBackgroundService : Service(), NetworkLogger {
     }
     
     /**
-     * Register broadcast receivers for Bluetooth events and notification actions
-     */
-    private fun registerReceivers() {
-        // Bluetooth discovery receiver
-        val filter = IntentFilter().apply {
-            addAction(BluetoothDevice.ACTION_FOUND)
-            addAction(BluetoothAdapter.ACTION_DISCOVERY_STARTED)
-            addAction(BluetoothAdapter.ACTION_DISCOVERY_FINISHED)
-        }
-        registerReceiver(bluetoothReceiver, filter)
-        
-        // Service action receiver
-        val serviceFilter = IntentFilter().apply {
-            addAction(DNCNotificationManager.ACTION_STOP_SERVICE)
-            addAction(DNCNotificationManager.ACTION_SCAN_DEVICES)
-        }
-        registerReceiver(serviceActionReceiver, serviceFilter)
-    }
-    
-    /**
-     * Start Bluetooth scanning
+     * Start Bluetooth scanning with improved discovery
      */
     fun startBluetoothScan() {
         // Clear old results
@@ -163,25 +170,11 @@ class DNCBackgroundService : Service(), NetworkLogger {
         updateServiceNotification()
         onDevicesUpdatedListener?.invoke(discoveredDevices)
         
-        // Use adaptive scanning if in optimal conditions
-        if (adaptiveScanningManager.isInOptimalScanningState()) {
-            log("Starting adaptive scanning sequence")
-            notificationManager.showDiscoveryNotification("Starting adaptive scanning sequence")
-            adaptiveScanningManager.startAdaptiveScanning()
-        } else {
-            // Use traditional scanning
-            log("Starting traditional Bluetooth scan")
-            notificationManager.showDiscoveryNotification("Starting Bluetooth scan")
-            
-            try {
-                if (bluetoothAdapter.isDiscovering) {
-                    bluetoothAdapter.cancelDiscovery()
-                }
-                bluetoothAdapter.startDiscovery()
-            } catch (e: Exception) {
-                log("Error starting scan: ${e.message}")
-            }
-        }
+        log("Starting Bluetooth scan through improved broadcast manager")
+        notificationManager.showDiscoveryNotification("Starting enhanced device discovery")
+        
+        // Use the new Bluetooth Broadcast Manager
+        bluetoothBroadcastManager.startDiscovery()
     }
     
     /**
@@ -191,121 +184,177 @@ class DNCBackgroundService : Service(), NetworkLogger {
         isScanning = false
         updateServiceNotification()
         
+        // Stop the adaptive scanning if running
         adaptiveScanningManager.stopAdaptiveScanning()
         
-        try {
-            if (bluetoothAdapter.isDiscovering) {
-                bluetoothAdapter.cancelDiscovery()
-            }
-        } catch (e: Exception) {
-            log("Error stopping scan: ${e.message}")
-        }
+        // Stop the enhanced discovery
+        bluetoothBroadcastManager.stopDiscovery()
     }
     
     /**
-     * Connect to a discovered device
-     */
-    fun connectToDevice(device: BluetoothDeviceInfo) {
-        if (device.isConnected) {
-            // Disconnect if already connected
-            networkManager.disconnectFromDevice(device) { updatedDevice, status, isConnected ->
-                updateConnectionStatus(updatedDevice, status, isConnected)
-            }
-        } else {
-            // Connect to the device
-            log("Connecting to ${device.name}")
-            notificationManager.showDiscoveryNotification("Connecting to ${device.name}")
-            
-            networkManager.connectToDevice(device) { updatedDevice, status, isConnected ->
-                updateConnectionStatus(updatedDevice, status, isConnected)
-            }
-        }
-    }
-    
-    /**
-     * Send a text message to a device
-     */
-    fun sendMessage(device: BluetoothDeviceInfo, message: String): Boolean {
-        return networkManager.sendTextMessage(device, message)
-    }
-    
-    /**
-     * Send a command to a device
-     */
-    fun sendCommand(device: BluetoothDeviceInfo, command: String, args: String = ""): Boolean {
-        return networkManager.sendCommand(device, command, args)
-    }
-    
-    /**
-     * Get all discovered devices
-     */
-    fun getDiscoveredDevices(): List<BluetoothDeviceInfo> {
-        return discoveredDevices.toList()
-    }
-    
-    /**
-     * Set listener for device list updates
-     */
-    fun setOnDevicesUpdatedListener(listener: (List<BluetoothDeviceInfo>) -> Unit) {
-        onDevicesUpdatedListener = listener
-    }
-    
-    /**
-     * Set listener for log messages
-     */
-    fun setOnLogMessageListener(listener: (String) -> Unit) {
-        onLogMessageListener = listener
-    }
-    
-    /**
-     * Update the connection status for a device
-     */
-    private suspend fun updateConnectionStatus(device: BluetoothDeviceInfo, status: String, isConnected: Boolean) {
-        withContext(Dispatchers.Main) {
-            val index = discoveredDevices.indexOfFirst { it.address == device.address }
-            if (index != -1) {
-                discoveredDevices[index] = device.copy(connectionStatus = status, isConnected = isConnected)
-                
-                // Update connected device count
-                connectedDeviceCount = discoveredDevices.count { it.isConnected }
-                updateServiceNotification()
-                
-                // Notify listener
-                onDevicesUpdatedListener?.invoke(discoveredDevices)
-                
-                // Show connection notification
-                val action = if (isConnected) "Connected to" else "Disconnected from"
-                notificationManager.showDiscoveryNotification("$action ${device.name}")
-            }
-        }
-    }
-    
-    /**
-     * Handle a received message
+     * Handle a received message and generate notifications
      */
     private fun handleReceivedMessage(device: BluetoothDeviceInfo, type: String, payload: String) {
+        // First update the device in our list
+        updateDeviceInList(device)
+        
+        // Log the message
         log("Message from ${device.name}: [$type] $payload")
         
+        // Forward message to any listeners
+        onLogMessageListener?.invoke("Message from ${device.name}: [$type] $payload")
+        
+        // Handle specific message types
         when (type) {
+            MessageProtocol.TYPE_HANDSHAKE -> {
+                if (payload.startsWith("DNC-CONNECT:")) {
+                    val deviceModel = payload.substring("DNC-CONNECT:".length)
+                    notificationManager.showMessageNotification(
+                        device.name, 
+                        "Device connected: $deviceModel"
+                    )
+                }
+            }
             MessageProtocol.TYPE_TEXT -> {
-                // Show notification for text message
+                // Show a notification for text messages
                 notificationManager.showMessageNotification(device.name, payload)
             }
             MessageProtocol.TYPE_FILE_START -> {
-                // Show notification for file transfer start
-                val parts = payload.split("|", limit = 2)
-                if (parts.size == 2) {
+                // Extract filename
+                val parts = payload.split("|")
+                if (parts.isNotEmpty()) {
                     val fileName = parts[0]
                     notificationManager.showDiscoveryNotification(
-                        "Starting file transfer: $fileName from ${device.name}"
+                        "Receiving file: $fileName from ${device.name}"
                     )
                 }
             }
             MessageProtocol.TYPE_FILE_END -> {
-                // Show notification for file transfer completion
                 notificationManager.showDiscoveryNotification(
-                    "File transfer complete: $payload from ${device.name}"
+                    "File transfer complete from ${device.name}"
                 )
+            }
+            MessageProtocol.TYPE_COMMAND -> {
+                // For important commands, notify user
+                val command = payload.split(":", limit = 2)[0]
+                if (command == MessageProtocol.CMD_RESTART || command == MessageProtocol.CMD_SHUTDOWN) {
+                    notificationManager.showDiscoveryNotification(
+                        "Received command: $command from ${device.name}"
+                    )
+                }
+            }
+        }
+    }
+    
+    /**
+     * Connect to a device
+     */
+    fun connectToDevice(device: BluetoothDeviceInfo) {
+        networkManager.connectToDevice(device) { updatedDevice, status, isConnected ->
+            // Update our device list
+            updateDeviceInList(updatedDevice.copy(connectionStatus = status, isConnected = isConnected))
+            
+            // Invoke listener if available
+            onConnectionStatusListener?.invoke(updatedDevice, status, isConnected)
+            
+            if (isConnected) {
+                connectedDeviceCount++
+                updateServiceNotification()
+            }
+        }
+    }
+    
+    /**
+     * Disconnect from a device
+     */
+    fun disconnectFromDevice(device: BluetoothDeviceInfo) {
+        networkManager.disconnectFromDevice(device) { updatedDevice, status, isConnected ->
+            // Update our device list
+            updateDeviceInList(updatedDevice.copy(connectionStatus = status, isConnected = isConnected))
+            
+            // Invoke listener if available
+            onConnectionStatusListener?.invoke(updatedDevice, status, isConnected)
+            
+            if (!isConnected && connectedDeviceCount > 0) {
+                connectedDeviceCount--
+                updateServiceNotification()
+            }
+        }
+    }
+    
+    /**
+     * Update a device in our local list
+     */
+    private fun updateDeviceInList(device: BluetoothDeviceInfo) {
+        val index = discoveredDevices.indexOfFirst { it.address == device.address }
+        if (index != -1) {
+            discoveredDevices[index] = device
+        } else {
+            discoveredDevices.add(device)
+        }
+        
+        // Notify listeners
+        onDevicesUpdatedListener?.invoke(discoveredDevices)
+    }
+    
+    /**
+     * Set a listener for device list updates
+     */
+    fun setOnDevicesUpdatedListener(listener: (List<BluetoothDeviceInfo>) -> Unit) {
+        this.onDevicesUpdatedListener = listener
+        // Also set the listener on the broadcast manager
+        bluetoothBroadcastManager.setOnDevicesUpdatedListener(listener)
+    }
+
+    /**
+     * Set a listener for log messages
+     */
+    fun setOnLogMessageListener(listener: (String) -> Unit) {
+        this.onLogMessageListener = listener
+    }
+    
+    /**
+     * Set a listener for connection status changes
+     */
+    fun setOnConnectionStatusListener(listener: (BluetoothDeviceInfo, String, Boolean) -> Unit) {
+        this.onConnectionStatusListener = listener
+    }
+    
+    /**
+     * Set a listener for network info updates
+     */
+    fun setOnNetworkInfoUpdatedListener(listener: (String) -> Unit) {
+        this.onNetworkInfoUpdatedListener = listener
+    }
+    
+    /**
+     * Start periodic network monitoring
+     */
+    private fun startNetworkMonitoring() {
+        serviceScope.launch {
+            while (true) {
+                try {
+                    // Get network info
+                    val networkInfo = DeviceNetworkInfo.getDeviceNetworkSummary(this@DNCBackgroundService)
+                    
+                    // Notify listeners
+                    onNetworkInfoUpdatedListener?.invoke(networkInfo)
+                    
+                    // Update connected devices from NetworkManager
+                    val connectedDevices = networkManager.getConnectedDevices()
+                    if (connectedDevices.isNotEmpty()) {
+                        for (device in connectedDevices) {
+                            updateDeviceInList(device)
+                        }
+                        connectedDeviceCount = connectedDevices.size
+                        updateServiceNotification()
+                    }
+                } catch (e: Exception) {
+                    log("Error in network monitoring: ${e.message}")
+                }
+                
+                // Check every 30 seconds
+                delay(30_000)
             }
         }
     }
@@ -314,148 +363,30 @@ class DNCBackgroundService : Service(), NetworkLogger {
      * Update the service notification with current status
      */
     private fun updateServiceNotification() {
-        notificationManager.updateServiceNotification(connectedDeviceCount, isScanning)
-    }
-    
-    /**
-     * Bluetooth discovery receiver
-     */
-    private val bluetoothReceiver = object : BroadcastReceiver() {
-        override fun onReceive(context: Context, intent: Intent) {
-            when (intent.action) {
-                BluetoothAdapter.ACTION_DISCOVERY_STARTED -> {
-                    log("Discovery started")
-                }
-                
-                BluetoothAdapter.ACTION_DISCOVERY_FINISHED -> {
-                    log("Discovery finished. Found ${discoveredDevices.size} compatible devices")
-                    isScanning = false
-                    updateServiceNotification()
-                    
-                    // Update adaptive scanning with results
-                    adaptiveScanningManager.recordScanResults(discoveredDevices.size)
-                    
-                    // Adjust signal thresholds based on discovered devices
-                    if (deviceRssiCount > 0) {
-                        val averageRssi = totalRssiSum / deviceRssiCount
-                        signalProcessor.adjustRssiThreshold(averageRssi, discoveredDevices.size)
-                    }
-                    
-                    // Update the device list with any energy-efficient processed devices
-                    val processedDevices = signalProcessor.getProcessedDevices()
-                    for (processedDevice in processedDevices) {
-                        if (!discoveredDevices.any { it.address == processedDevice.address }) {
-                            discoveredDevices.add(processedDevice)
-                        }
-                    }
-                    
-                    // Notify listener
-                    onDevicesUpdatedListener?.invoke(discoveredDevices)
-                    
-                    // Show discovery completion notification
-                    notificationManager.showDiscoveryNotification(
-                        "Found ${discoveredDevices.size} compatible devices"
-                    )
-                }
-                
-                BluetoothDevice.ACTION_FOUND -> {
-                    val device = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
-                        intent.getParcelableExtra(BluetoothDevice.EXTRA_DEVICE, BluetoothDevice::class.java)
-                    } else {
-                        @Suppress("DEPRECATION")
-                        intent.getParcelableExtra(BluetoothDevice.EXTRA_DEVICE)
-                    }
-                    
-                    // Get signal strength (RSSI)
-                    val rssi = intent.getShortExtra(BluetoothDevice.EXTRA_RSSI, Short.MIN_VALUE).toInt()
-                    
-                    // Update signal statistics
-                    if (rssi != Short.MIN_VALUE.toInt()) {
-                        totalRssiSum += rssi
-                        deviceRssiCount++
-                    }
-                    
-                    device?.let {
-                        try {
-                            // Check if the signal strength is acceptable
-                            if (rssi != Short.MIN_VALUE.toInt() && !signalProcessor.isSignalStrengthAcceptable(rssi)) {
-                                log("Device signal too weak (${rssi} dBm), skipping")
-                                return
-                            }
-                            
-                            // Process the device with energy efficiency
-                            val processed = signalProcessor.processDevice(it, rssi)
-                            
-                            // If processed immediately, skip the traditional processing
-                            if (processed) {
-                                return
-                            }
-                            
-                            try {
-                                val deviceName = if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.S) {
-                                    if (checkSelfPermission(android.Manifest.permission.BLUETOOTH_CONNECT) != android.content.pm.PackageManager.PERMISSION_GRANTED) {
-                                        log("Missing BLUETOOTH_CONNECT permission")
-                                        return
-                                    }
-                                    it.name ?: "Unknown"
-                                } else {
-                                    @Suppress("DEPRECATION")
-                                    it.name ?: "Unknown"
-                                }
-                                
-                                val deviceAddress = it.address
-                                
-                                log("Found device: $deviceName ($deviceAddress) with signal strength: ${rssi} dBm")
-                                
-                                // Filter using DNCPrefixValidator
-                                if (DNCPrefixValidator.hasValidPrefix(deviceName)) {
-                                    val matchingPrefix = DNCPrefixValidator.getMatchingPrefix(deviceName)
-                                    log("Compatible device found with prefix '$matchingPrefix': $deviceName")
-                                    
-                                    // Get WiFi information and IP address
-                                    val wifiInfo = com.ivelosi.dnc.network.WifiUtils.getWifiInfo(wifiManager)
-                                    val ipAddress = com.ivelosi.dnc.network.WifiUtils.extractIpAddress(wifiInfo, wifiManager)
-                                    
-                                    // Create device info object
-                                    val deviceInfo = BluetoothDeviceInfo(
-                                        name = deviceName,
-                                        address = deviceAddress,
-                                        wifiInfo = wifiInfo,
-                                        ipAddress = ipAddress
-                                    )
-                                    
-                                    // Add only if not already in the list
-                                    if (!discoveredDevices.any { it.address == deviceAddress }) {
-                                        discoveredDevices.add(deviceInfo)
-                                        
-                                        // Notify listener about updated device list
-                                        onDevicesUpdatedListener?.invoke(discoveredDevices)
-                                    }
-                                }
-                            } catch (e: Exception) {
-                                log("Error processing device details: ${e.message}")
-                            }
-                        } catch (e: Exception) {
-                            log("Error processing device: ${e.message}")
-                        }
-                    }
-                }
-            }
+        val notification = notificationManager.createServiceNotification(
+            isScanning = isScanning,
+            connectedDevices = connectedDeviceCount
+        )
+        
+        try {
+            notificationManager.updateServiceNotification(notification)
+        } catch (e: Exception) {
+            log("Error updating service notification: ${e.message}")
         }
     }
     
     /**
-     * Service action receiver
+     * Receiver for service actions from notifications
      */
     private val serviceActionReceiver = object : BroadcastReceiver() {
         override fun onReceive(context: Context, intent: Intent) {
             when (intent.action) {
                 DNCNotificationManager.ACTION_STOP_SERVICE -> {
-                    log("Stop service action received")
+                    log("Stopping service from notification")
                     stopSelf()
                 }
                 DNCNotificationManager.ACTION_SCAN_DEVICES -> {
-                    log("Scan devices action received")
+                    log("Starting scan from notification")
                     startBluetoothScan()
                 }
             }
@@ -464,32 +395,28 @@ class DNCBackgroundService : Service(), NetworkLogger {
     
     override fun log(message: String) {
         Log.d(TAG, message)
-        val timestamp = SimpleDateFormat("HH:mm:ss", Locale.getDefault()).format(Date())
-        val logMessage = "[$timestamp] $message"
-        
-        // Send log to activity if it's listening
-        onLogMessageListener?.invoke(logMessage)
+        onLogMessageListener?.invoke(message)
     }
     
     override fun onDestroy() {
-        log("DNC Background Service destroyed")
+        super.onDestroy()
         
-        // Clean up resources
-        networkManager.cleanup()
-        adaptiveScanningManager.cleanup()
-        signalProcessor.cleanup()
-        
-        // Unregister receivers
+        // Clean up
         try {
-            unregisterReceiver(bluetoothReceiver)
             unregisterReceiver(serviceActionReceiver)
         } catch (e: Exception) {
             Log.e(TAG, "Error unregistering receivers: ${e.message}")
         }
         
-        // Cancel all jobs
+        // Clean up network manager
+        networkManager.cleanup()
+        
+        // Clean up broadcast manager
+        bluetoothBroadcastManager.cleanup()
+        
+        // Cancel all coroutines
         serviceJob.cancel()
         
-        super.onDestroy()
+        log("DNC Background Service destroyed")
     }
 } 

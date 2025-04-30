@@ -24,15 +24,18 @@ class DNCNotificationManager(private val context: Context) {
         const val CHANNEL_ID_SERVICE = "dnc_service_channel"
         const val CHANNEL_ID_DISCOVERY = "dnc_discovery_channel"
         const val CHANNEL_ID_MESSAGES = "dnc_messages_channel"
+        const val CHANNEL_ID_CONNECTION = "dnc_connection_channel"
         
         // Notification IDs
         const val NOTIFICATION_ID_SERVICE = 1001
         const val NOTIFICATION_ID_DISCOVERY = 1002
+        const val NOTIFICATION_ID_CONNECTION = 1003
         const val NOTIFICATION_ID_MESSAGE_BASE = 2000
         
         // Intent actions
         const val ACTION_STOP_SERVICE = "com.ivelosi.dnc.STOP_SERVICE"
         const val ACTION_SCAN_DEVICES = "com.ivelosi.dnc.SCAN_DEVICES"
+        const val ACTION_SHOW_NETWORK_INFO = "com.ivelosi.dnc.SHOW_NETWORK_INFO"
     }
 
     private val notificationManager = context.getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
@@ -74,8 +77,18 @@ class DNCNotificationManager(private val context: Context) {
                 vibrationPattern = longArrayOf(0, 250, 250, 250)
             }
             
+            // Connection channel - for connection events
+            val connectionChannel = NotificationChannel(
+                CHANNEL_ID_CONNECTION,
+                "DNC Connections",
+                NotificationManager.IMPORTANCE_DEFAULT
+            ).apply {
+                description = "Updates about device connections and socket server"
+                setShowBadge(true)
+            }
+            
             notificationManager.createNotificationChannels(
-                listOf(serviceChannel, discoveryChannel, messagesChannel)
+                listOf(serviceChannel, discoveryChannel, messagesChannel, connectionChannel)
             )
         }
     }
@@ -83,7 +96,7 @@ class DNCNotificationManager(private val context: Context) {
     /**
      * Create a foreground service notification for background running
      */
-    fun createServiceNotification(deviceCount: Int = 0, isScanning: Boolean = false): Notification {
+    fun createServiceNotification(isScanning: Boolean = false, connectedDevices: Int = 0): Notification {
         val mainActivityIntent = Intent(context, MainActivity::class.java).apply {
             flags = Intent.FLAG_ACTIVITY_CLEAR_TOP or Intent.FLAG_ACTIVITY_SINGLE_TOP
         }
@@ -107,11 +120,18 @@ class DNCNotificationManager(private val context: Context) {
             PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
         )
         
+        // Network info action
+        val infoIntent = Intent(ACTION_SHOW_NETWORK_INFO)
+        val infoPendingIntent = PendingIntent.getBroadcast(
+            context, 0, infoIntent,
+            PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
+        )
+        
         // Status text based on current activity
         val statusText = when {
             isScanning -> "Currently scanning for devices"
-            deviceCount > 0 -> "Connected to $deviceCount device(s)"
-            else -> "Running in background"
+            connectedDevices > 0 -> "Connected to $connectedDevices device(s)"
+            else -> "Socket server ready for connections"
         }
         
         // Build the notification
@@ -121,9 +141,17 @@ class DNCNotificationManager(private val context: Context) {
             .setSmallIcon(R.drawable.ic_launcher_foreground) // You should replace with your own icon
             .setContentIntent(pendingIntent)
             .addAction(android.R.drawable.ic_menu_search, "Scan", scanPendingIntent)
+            .addAction(android.R.drawable.ic_menu_info_details, "Info", infoPendingIntent)
             .addAction(android.R.drawable.ic_menu_close_clear_cancel, "Stop", stopPendingIntent)
             .setOngoing(true)
             .build()
+    }
+    
+    /**
+     * Update the foreground service notification
+     */
+    fun updateServiceNotification(notification: Notification) {
+        notificationManager.notify(NOTIFICATION_ID_SERVICE, notification)
     }
     
     /**
@@ -138,6 +166,30 @@ class DNCNotificationManager(private val context: Context) {
             .build()
             
         notificationManager.notify(NOTIFICATION_ID_DISCOVERY, notification)
+    }
+    
+    /**
+     * Create a notification for connection events
+     */
+    fun showConnectionNotification(title: String, message: String) {
+        val mainActivityIntent = Intent(context, MainActivity::class.java).apply {
+            flags = Intent.FLAG_ACTIVITY_CLEAR_TOP or Intent.FLAG_ACTIVITY_SINGLE_TOP
+        }
+        
+        val pendingIntent = PendingIntent.getActivity(
+            context, 0, mainActivityIntent,
+            PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
+        )
+        
+        val notification = NotificationCompat.Builder(context, CHANNEL_ID_CONNECTION)
+            .setContentTitle(title)
+            .setContentText(message)
+            .setSmallIcon(R.drawable.ic_launcher_foreground) // Replace with your own icon
+            .setAutoCancel(true)
+            .setContentIntent(pendingIntent)
+            .build()
+            
+        notificationManager.notify(NOTIFICATION_ID_CONNECTION, notification)
     }
     
     /**
@@ -168,11 +220,17 @@ class DNCNotificationManager(private val context: Context) {
     }
     
     /**
-     * Update the foreground service notification with new status
+     * Show a socket server status notification
      */
-    fun updateServiceNotification(deviceCount: Int, isScanning: Boolean) {
-        val notification = createServiceNotification(deviceCount, isScanning)
-        notificationManager.notify(NOTIFICATION_ID_SERVICE, notification)
+    fun showSocketServerNotification(serverPort: Int) {
+        val notification = NotificationCompat.Builder(context, CHANNEL_ID_CONNECTION)
+            .setContentTitle("DNC Socket Server")
+            .setContentText("Server running on port $serverPort")
+            .setSmallIcon(R.drawable.ic_launcher_foreground) // Replace with your own icon
+            .setAutoCancel(false)
+            .build()
+            
+        notificationManager.notify(NOTIFICATION_ID_CONNECTION, notification)
     }
     
     /**

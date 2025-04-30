@@ -11,5 +11,6 @@ data class BluetoothDeviceInfo(
     val wifiInfo: String,
     val ipAddress: String = "",
     var connectionStatus: String = "Not connected",
-    var isConnected: Boolean = false
+    var isConnected: Boolean = false,
+    val rssi: Int = -100  // Signal strength (RSSI) with default value
 )

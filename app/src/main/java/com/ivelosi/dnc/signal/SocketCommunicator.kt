@@ -23,7 +23,7 @@ import com.ivelosi.dnc.notification.DNCNotificationManager
  * Handles communication over an established socket connection
  */
 class SocketCommunicator(
-    private val deviceInfo: BluetoothDeviceInfo,
+    public val deviceInfo: BluetoothDeviceInfo,
     private val socket: Socket,
     private val logger: NetworkLogger,
     private val scope: CoroutineScope,
@@ -176,6 +176,22 @@ class SocketCommunicator(
                 MessageProtocol.TYPE_HANDSHAKE -> {
                     // Send handshake response if needed
                     sendMessage(MessageProtocol.TYPE_HANDSHAKE, "ACCEPTED")
+                    
+                    // After handshake, broadcast our IP address
+                    try {
+                        val wifiManager = context.applicationContext.getSystemService(Context.WIFI_SERVICE) as android.net.wifi.WifiManager
+                        val wifiInfo = com.ivelosi.dnc.network.WifiUtils.getWifiInfo(wifiManager)
+                        val localIP = com.ivelosi.dnc.network.WifiUtils.extractIpAddress(wifiInfo, wifiManager)
+                        
+                        if (localIP.isNotEmpty()) {
+                            // Send our IP address to the newly connected device
+                            sendMessage(MessageProtocol.TYPE_IP_BROADCAST, localIP)
+                            logger.log("Sent our IP address ($localIP) to ${deviceInfo.name}")
+                        }
+                    } catch (e: Exception) {
+                        logger.log("Error broadcasting IP during handshake: ${e.message}")
+                    }
+                    
                     notificationManager.showDiscoveryNotification(
                         "Connection handshake completed with ${deviceInfo.name}"
                     )
@@ -199,6 +215,10 @@ class SocketCommunicator(
                     notificationManager.showDiscoveryNotification(
                         "File transfer complete from ${deviceInfo.name}"
                     )
+                }
+                MessageProtocol.TYPE_IP_BROADCAST -> {
+                    // Handle IP address broadcast - this will be processed by NetworkManager
+                    logger.log("Received IP broadcast from ${deviceInfo.name}: $payload")
                 }
             }
 

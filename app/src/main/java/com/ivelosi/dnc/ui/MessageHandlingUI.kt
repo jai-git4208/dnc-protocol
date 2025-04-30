@@ -9,6 +9,7 @@ import android.app.AlertDialog
 import android.content.Intent
 import android.net.Uri
 import android.view.View
+import android.view.ViewGroup
 import android.widget.Button
 import android.widget.EditText
 import android.widget.LinearLayout
@@ -55,21 +56,80 @@ class MessageHandlingUI(
             val messageLayout = activity.findViewById<View>(R.id.messageLayout)
             if (messageLayout == null) {
                 logger.log("ERROR: messageLayout view not found")
+                Toast.makeText(activity, "Error initializing message UI", Toast.LENGTH_SHORT).show()
+                
+                // Create an emergency fallback container
+                val fallbackContainer = LinearLayout(activity)
+                fallbackContainer.orientation = LinearLayout.VERTICAL
+                fallbackContainer.visibility = View.GONE
+                messageContainer = fallbackContainer
+                
+                // Add the fallback container to activity's root view
+                val rootView = activity.findViewById<ViewGroup>(android.R.id.content)
+                rootView?.addView(fallbackContainer)
+                
+                logger.log("Created fallback message container")
                 return
             }
 
-            // Then find the messageContainer within the included layout
-            messageContainer = messageLayout.findViewById(R.id.messageContainer)
-            if (messageContainer == null) {
-                logger.log("ERROR: messageContainer view not found in messageLayout")
-                return
+            // Try to find messageContainer within the included layout first
+            val containerInLayout = messageLayout.findViewById<LinearLayout>(R.id.messageContainer)
+            
+            // Next, try to find it directly in the activity
+            val containerInActivity = activity.findViewById<LinearLayout>(R.id.messageContainer)
+            
+            // Finally, check if the included layout itself is the messageContainer
+            // (since the message_layout.xml has id="messageContainer" on its root element)
+            val layoutAsContainer = if (messageLayout is LinearLayout) messageLayout else null
+            
+            // Assign the first non-null container we find
+            when {
+                containerInLayout != null -> {
+                    logger.log("Found messageContainer in messageLayout")
+                    messageContainer = containerInLayout
+                }
+                containerInActivity != null -> {
+                    logger.log("Found messageContainer directly in activity")
+                    messageContainer = containerInActivity
+                }
+                layoutAsContainer != null -> {
+                    logger.log("Using messageLayout itself as container")
+                    messageContainer = layoutAsContainer
+                }
+                else -> {
+                    logger.log("ERROR: messageContainer view not found in any layout")
+                    Toast.makeText(activity, "Error initializing message UI components", Toast.LENGTH_SHORT).show()
+                    
+                    // Create an emergency fallback container
+                    val fallbackContainer = LinearLayout(activity)
+                    fallbackContainer.orientation = LinearLayout.VERTICAL
+                    fallbackContainer.visibility = View.GONE
+                    messageContainer = fallbackContainer
+                    
+                    // Add the fallback container to activity's root view
+                    val rootView = activity.findViewById<ViewGroup>(android.R.id.content)
+                    rootView?.addView(fallbackContainer)
+                    
+                    logger.log("Created fallback message container")
+                }
             }
 
-            // Now find all other views within the messageContainer
-            messageEditText = messageContainer.findViewById(R.id.messageEditText)
-            sendMessageButton = messageContainer.findViewById(R.id.sendMessageButton)
-            sendFileButton = messageContainer.findViewById(R.id.sendFileButton)
-            sendCommandButton = messageContainer.findViewById(R.id.sendCommandButton)
+            // Now find all other views within the messageContainer or activity layout
+            messageEditText = activity.findViewById(R.id.messageEditText) 
+                ?: messageLayout.findViewById(R.id.messageEditText)
+                ?: throw Exception("messageEditText not found")
+                
+            sendMessageButton = activity.findViewById(R.id.sendMessageButton)
+                ?: messageLayout.findViewById(R.id.sendMessageButton) 
+                ?: throw Exception("sendMessageButton not found")
+                
+            sendFileButton = activity.findViewById(R.id.sendFileButton)
+                ?: messageLayout.findViewById(R.id.sendFileButton)
+                ?: throw Exception("sendFileButton not found")
+                
+            sendCommandButton = activity.findViewById(R.id.sendCommandButton)
+                ?: messageLayout.findViewById(R.id.sendCommandButton)
+                ?: throw Exception("sendCommandButton not found")
 
             // Set click listeners
             sendMessageButton.setOnClickListener {
@@ -99,6 +159,26 @@ class MessageHandlingUI(
         } catch (e: Exception) {
             logger.log("Error initializing MessageHandlingUI: ${e.message}")
             e.printStackTrace()
+            
+            // Create a fallback UI as last resort
+            try {
+                val fallbackContainer = LinearLayout(activity)
+                fallbackContainer.orientation = LinearLayout.VERTICAL
+                fallbackContainer.visibility = View.GONE
+                messageContainer = fallbackContainer
+                
+                // Add the fallback container to activity's root view
+                val rootView = activity.findViewById<ViewGroup>(android.R.id.content)
+                rootView?.addView(fallbackContainer)
+                
+                logger.log("Created emergency fallback message container after exception")
+            } catch (e2: Exception) {
+                // We've done all we can
+                logger.log("CRITICAL: Even fallback container creation failed: ${e2.message}")
+            }
+            
+            // Create a fallback UI or notify the user
+            Toast.makeText(activity, "Error initializing UI: ${e.message}", Toast.LENGTH_LONG).show()
         }
     }
 

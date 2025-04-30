@@ -18,6 +18,7 @@ object MessageProtocol {
     const val TYPE_FILE_END = "FILE_END"
     const val TYPE_STATUS = "STATUS"
     const val TYPE_ERROR = "ERROR"
+    const val TYPE_IP_BROADCAST = "IP_BROADCAST"
 
     // Common commands
     const val CMD_PING = "PING"

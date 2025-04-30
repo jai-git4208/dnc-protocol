@@ -216,7 +216,8 @@ class EnergyEfficientSignalProcessor(
                     address = deviceAddress,
                     wifiInfo = wifiInfo,
                     ipAddress = ipAddress,
-                    connectionStatus = "Signal processed"
+                    connectionStatus = "Signal processed",
+                    rssi = -65  // Add a default RSSI value
                 )
                 
                 deviceCache[deviceAddress] = CachedDeviceInfo(deviceInfo)

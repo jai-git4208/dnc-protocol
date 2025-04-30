@@ -33,11 +33,13 @@ import android.widget.TextView
 import android.widget.Toast
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.annotation.RequiresPermission
+import androidx.appcompat.app.AlertDialog
 import androidx.appcompat.app.AppCompatActivity
 import androidx.core.app.ActivityCompat
 import androidx.core.content.ContextCompat
 import androidx.recyclerview.widget.LinearLayoutManager
 import androidx.recyclerview.widget.RecyclerView
+import com.ivelosi.dnc.bluetooth.BluetoothBroadcastManager
 import com.ivelosi.dnc.network.BluetoothDeviceInfo
 import com.ivelosi.dnc.network.NetworkLogger
 import com.ivelosi.dnc.network.NetworkManager
@@ -51,10 +53,12 @@ import java.util.*
 import com.ivelosi.dnc.ui.MessageHandlingUI
 import com.ivelosi.dnc.notification.DNCNotificationManager
 import com.ivelosi.dnc.service.DNCBackgroundService
+import com.ivelosi.dnc.network.DeviceNetworkInfo
 
 class MainActivity : AppCompatActivity(), NetworkLogger {
     private lateinit var scanButton: Button
     private lateinit var setDeviceNameButton: Button
+    private lateinit var networkInfoButton: Button
     private lateinit var devicesRecyclerView: RecyclerView
     private lateinit var logTextView: TextView
     private lateinit var logScrollView: ScrollView
@@ -69,6 +73,9 @@ class MainActivity : AppCompatActivity(), NetworkLogger {
     
     // Add energy-efficient signal processor
     private lateinit var signalProcessor: EnergyEfficientSignalProcessor
+    
+    // Add BluetoothBroadcastManager for local fallback when service unavailable
+    private lateinit var bluetoothBroadcastManager: BluetoothBroadcastManager
 
     private lateinit var deviceAdapter: DeviceAdapter
     private val discoveredDevices = mutableListOf<BluetoothDeviceInfo>()
@@ -108,6 +115,7 @@ class MainActivity : AppCompatActivity(), NetworkLogger {
         // Initialize views
         scanButton = findViewById(R.id.scanButton)
         setDeviceNameButton = findViewById(R.id.setDeviceNameButton)
+        networkInfoButton = findViewById(R.id.networkInfoButton)
         devicesRecyclerView = findViewById(R.id.devicesRecyclerView)
         logTextView = findViewById(R.id.logTextView)
         logScrollView = findViewById<ScrollView>(R.id.logScrollView)
@@ -124,6 +132,15 @@ class MainActivity : AppCompatActivity(), NetworkLogger {
         
         // Initialize Energy-Efficient Signal Processor
         signalProcessor = EnergyEfficientSignalProcessor(this, wifiManager, this)
+        
+        // Initialize BluetoothBroadcastManager for local fallback
+        bluetoothBroadcastManager = BluetoothBroadcastManager(this, bluetoothAdapter, this)
+        bluetoothBroadcastManager.setOnDevicesUpdatedListener { devices ->
+            // Update our device list
+            discoveredDevices.clear()
+            discoveredDevices.addAll(devices)
+            deviceAdapter.updateDevices(discoveredDevices)
+        }
 
         // Initialize Network Manager
         networkManager = NetworkManager(this, this)
@@ -161,6 +178,10 @@ class MainActivity : AppCompatActivity(), NetworkLogger {
             addAction(BluetoothAdapter.ACTION_DISCOVERY_FINISHED)
         }
         registerReceiver(bluetoothReceiver, filter)
+        
+        // Register network info action receiver
+        val infoFilter = IntentFilter(DNCNotificationManager.ACTION_SHOW_NETWORK_INFO)
+        registerReceiver(networkInfoReceiver, infoFilter)
 
         // Set up button click listeners
         scanButton.setOnClickListener {
@@ -170,8 +191,24 @@ class MainActivity : AppCompatActivity(), NetworkLogger {
         setDeviceNameButton.setOnClickListener {
             setDeviceName()
         }
+        
+        networkInfoButton.setOnClickListener {
+            showNetworkInfoDialog()
+        }
+
+        // Add long press on scan button to show network info dialog
+        scanButton.setOnLongClickListener {
+            showNetworkInfoDialog()
+            true
+        }
+
+        // Set up a periodic refresh of connected devices
+        startConnectedDevicesRefresh()
 
         log("App initialized")
+        
+        // Display network info in logs
+        log("Network Info: " + DeviceNetworkInfo.getDeviceNetworkSummary(this))
     }
 
     private fun requestPermissions() {
@@ -279,22 +316,16 @@ class MainActivity : AppCompatActivity(), NetworkLogger {
             discoveredDevices.clear()
             deviceAdapter.updateDevices(discoveredDevices)
             
-            log("Starting Bluetooth scan through service...")
+            log("Starting Bluetooth scan...")
             notificationManager.showDiscoveryNotification("Starting device discovery")
             
             // Try to use the service if bound
             if (isServiceBound && dncService != null) {
                 dncService?.startBluetoothScan()
             } else {
-                // Fallback to traditional scanning if service isn't available
-                if (ActivityCompat.checkSelfPermission(this, Manifest.permission.BLUETOOTH_SCAN) == PackageManager.PERMISSION_GRANTED) {
-                    if (bluetoothAdapter.isDiscovering) {
-                        bluetoothAdapter.cancelDiscovery()
-                    }
-                    bluetoothAdapter.startDiscovery()
-                } else {
-                    log("Missing BLUETOOTH_SCAN permission")
-                }
+                // Use the improved BluetoothBroadcastManager as fallback
+                log("Service not available, using local BluetoothBroadcastManager")
+                bluetoothBroadcastManager.startDiscovery()
             }
         }
     }
@@ -412,7 +443,8 @@ class MainActivity : AppCompatActivity(), NetworkLogger {
                                         name = deviceName,
                                         address = deviceAddress,
                                         wifiInfo = wifiInfo,
-                                        ipAddress = ipAddress
+                                        ipAddress = ipAddress,
+                                        rssi = rssi
                                     )
 
                                     // Add only if not already in the list
@@ -451,11 +483,11 @@ class MainActivity : AppCompatActivity(), NetworkLogger {
                     }
                 }
             } else {
-                // Connect to the device
+                // Try to connect
                 networkManager.connectToDevice(device) { updatedDevice, status, isConnected ->
                     updateConnectionStatus(updatedDevice, status, isConnected)
 
-                    // Set as selected device when connection is successful
+                    // Set as selected device if connected
                     if (isConnected) {
                         selectedDevice = updatedDevice
                         messageHandlingUI.setSelectedDevice(updatedDevice)
@@ -496,11 +528,29 @@ class MainActivity : AppCompatActivity(), NetworkLogger {
 
     override fun onDestroy() {
         super.onDestroy()
-
-        // Unbind from service
-        if (isServiceBound) {
-            unbindService(serviceConnection)
-            isServiceBound = false
+        try {
+            // Unregister receivers
+            unregisterReceiver(bluetoothReceiver)
+            unregisterReceiver(networkInfoReceiver)
+            
+            // Clean up resources
+            if (isServiceBound) {
+                unbindService(serviceConnection)
+                isServiceBound = false
+            }
+            
+            // Clean up bluetooth broadcast manager
+            if (::bluetoothBroadcastManager.isInitialized) {
+                bluetoothBroadcastManager.cleanup()
+            }
+            
+            // Clean up network manager
+            networkManager.cleanup()
+            
+            // Cancel coroutines
+            coroutineScope.cancel()
+        } catch (e: Exception) {
+            Log.e(TAG, "Error during cleanup: ${e.message}")
         }
 
         // Clean up resources
@@ -510,10 +560,83 @@ class MainActivity : AppCompatActivity(), NetworkLogger {
             }
         }
 
-        // Cancel coroutine scope
-        coroutineScope.cancel()
-
         log("App destroyed")
+    }
+
+    // Add this new method to periodically refresh the list of connected devices
+    private fun startConnectedDevicesRefresh() {
+        coroutineScope.launch {
+            while (true) {
+                try {
+                    // Update device list with connected devices from NetworkManager
+                    val connectedDevices = networkManager.getConnectedDevices()
+                    if (connectedDevices.isNotEmpty()) {
+                        updateConnectedDevices(connectedDevices)
+                    }
+                } catch (e: Exception) {
+                    Log.e(TAG, "Error refreshing connected devices: ${e.message}")
+                }
+                delay(5000) // Refresh every 5 seconds
+            }
+        }
+    }
+
+    // Add this new method to update the device list with connected devices
+    private fun updateConnectedDevices(connectedDevices: List<BluetoothDeviceInfo>) {
+        runOnUiThread {
+            // For each connected device, check if it's already in our list
+            val updatedDevices = discoveredDevices.toMutableList()
+            
+            connectedDevices.forEach { connectedDevice ->
+                val existingIndex = updatedDevices.indexOfFirst { it.address == connectedDevice.address }
+                
+                if (existingIndex != -1) {
+                    // Update existing device
+                    updatedDevices[existingIndex] = connectedDevice
+                } else {
+                    // Add new device
+                    updatedDevices.add(connectedDevice)
+                }
+            }
+            
+            // Update our list and adapter
+            discoveredDevices.clear()
+            discoveredDevices.addAll(updatedDevices)
+            deviceAdapter.updateDevices(discoveredDevices)
+        }
+    }
+
+    /**
+     * Show network information dialog to help with debugging
+     */
+    private fun showNetworkInfoDialog() {
+        val networkInfo = DeviceNetworkInfo.getDeviceNetworkSummary(this)
+        
+        AlertDialog.Builder(this)
+            .setTitle("Network Information")
+            .setMessage(networkInfo)
+            .setPositiveButton("Copy") { _, _ ->
+                // Copy to clipboard
+                val clipboard = getSystemService(Context.CLIPBOARD_SERVICE) as android.content.ClipboardManager
+                val clip = android.content.ClipData.newPlainText("Network Info", networkInfo)
+                clipboard.setPrimaryClip(clip)
+                Toast.makeText(this, "Network info copied to clipboard", Toast.LENGTH_SHORT).show()
+            }
+            .setNegativeButton("Close", null)
+            .show()
+    }
+
+    /**
+     * Receive the network info action from notifications
+     */
+    private val networkInfoReceiver = object : BroadcastReceiver() {
+        override fun onReceive(context: Context, intent: Intent) {
+            when (intent.action) {
+                DNCNotificationManager.ACTION_SHOW_NETWORK_INFO -> {
+                    showNetworkInfoDialog()
+                }
+            }
+        }
     }
 }
 
