@@ -280,8 +280,8 @@ class BluetoothBroadcastManager(
                     logger.log("Compatible device found with prefix '$matchingPrefix': $deviceName")
                     
                     // Get WiFi information
-                    val wifiInfo = WifiUtils.getWifiInfo(wifiManager)
-                    val ipAddress = WifiUtils.extractIpAddress(wifiInfo, wifiManager)
+                    val wifiInfo = WifiUtils.getWifiInfo(context, wifiManager)
+                    val ipAddress = WifiUtils.extractIpAddress(context, wifiInfo, wifiManager, device)
                     
                     // Create device info
                     val deviceInfo = BluetoothDeviceInfo(

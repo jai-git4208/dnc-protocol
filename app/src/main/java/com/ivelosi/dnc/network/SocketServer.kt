@@ -185,6 +185,42 @@ class SocketServer(
                 return
             }
             
+            // Check if this is a handshake request first
+            try {
+                // Set a timeout so we don't block forever
+                clientSocket.soTimeout = 1000
+                
+                val inputStream = clientSocket.inputStream
+                // Read a small buffer to check if it's a handshake request
+                val buffer = ByteArray(256)
+                val bytesRead = inputStream.read(buffer)
+                
+                if (bytesRead > 0) {
+                    val message = String(buffer, 0, bytesRead)
+                    
+                    // Check if this is a network info request
+                    if (message.trim() == BluetoothHandshake.CMD_REQUEST_NETWORK_INFO) {
+                        logger.log("Received network info request from $clientAddress")
+                        
+                        // Process the handshake request
+                        val handshake = BluetoothHandshake(context, logger)
+                        handshake.handleIncomingHandshake(inputStream, clientSocket.outputStream)
+                        
+                        // Close the socket after handshake is complete
+                        clientSocket.close()
+                        return
+                    }
+                    
+                    // If not a handshake request, continue with normal processing
+                    // Reset the timeout
+                    clientSocket.soTimeout = 0
+                }
+                
+            } catch (e: Exception) {
+                logger.log("Error checking for handshake: ${e.message}")
+                // Continue with normal processing
+            }
+            
             // Create a temporary device info until we get the handshake
             val tempDevice = BluetoothDeviceInfo(
                 name = "Unknown Device ($clientAddress)",
@@ -222,6 +258,11 @@ class SocketServer(
             
         } catch (e: Exception) {
             logger.log("Error handling client connection: ${e.message}")
+            try {
+                clientSocket.close()
+            } catch (e: Exception) {
+                // Ignore
+            }
         }
     }
 
@@ -285,8 +326,8 @@ class SocketServer(
         try {
             // Get our current IP address
             val wifiManager = context.applicationContext.getSystemService(Context.WIFI_SERVICE) as WifiManager
-            val wifiInfo = WifiUtils.getWifiInfo(wifiManager)
-            val localIP = WifiUtils.extractIpAddress(wifiInfo, wifiManager)
+            val wifiInfo = WifiUtils.getWifiInfo(context, wifiManager)
+            val localIP = WifiUtils.extractIpAddress(context, wifiInfo, wifiManager, null)
             
             if (localIP.isNotEmpty() && !isLocalIP(localIP)) {
                 // Send our IP address to the peer

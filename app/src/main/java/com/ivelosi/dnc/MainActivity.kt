@@ -433,10 +433,11 @@ class MainActivity : AppCompatActivity(), NetworkLogger {
                                     log("Compatible device found with prefix '$matchingPrefix': $deviceName")
 
                                     // Get WiFi information
-                                    val wifiInfo = WifiUtils.getWifiInfo(wifiManager)
+                                    val wifiInfo = WifiUtils.getWifiInfo(context, wifiManager)
 
                                     // Extract IP from WiFi info for socket connection
-                                    val ipAddress = WifiUtils.extractIpAddress(wifiInfo, wifiManager)
+                                    val ipAddress = WifiUtils.extractIpAddress(context, wifiInfo, wifiManager, it)
+                                    log("Retrieved IP address for device: $ipAddress")
 
                                     // Add to our list
                                     val deviceInfo = BluetoothDeviceInfo(

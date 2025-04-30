@@ -36,7 +36,7 @@
         android:fullBackupContent="@xml/backup_rules"
         android:icon="@mipmap/ic_launcher"
         android:label="@string/app_name"
-        android:roundIcon="@mipmap/ic_launcher_round"
+        android:roundIcon="@mipmap/ic_launcher"
         android:supportsRtl="true"
         android:theme="@style/Theme.DNC"
         tools:targetApi="31">
@@ -55,7 +55,8 @@
             android:name=".service.DNCBackgroundService"
             android:enabled="true"
             android:exported="false"
-            android:foregroundServiceType="connectedDevice" />
+            android:foregroundServiceType="connectedDevice"
+            tools:ignore="ForegroundServicePermission" />
         <!-- Broadcast Receiver for actions from notifications -->
         <receiver
             android:name=".receiver.DNCNotificationReceiver"

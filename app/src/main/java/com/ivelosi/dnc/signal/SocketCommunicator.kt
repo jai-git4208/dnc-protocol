@@ -14,6 +14,7 @@ import java.io.PrintWriter
 import java.net.Socket
 import java.util.concurrent.ConcurrentLinkedQueue
 import com.ivelosi.dnc.notification.DNCNotificationManager
+import android.net.wifi.WifiManager
 
 /**
  * (c)Ivelosi Technologies. All Rights Reserved.
@@ -179,9 +180,9 @@ class SocketCommunicator(
                     
                     // After handshake, broadcast our IP address
                     try {
-                        val wifiManager = context.applicationContext.getSystemService(Context.WIFI_SERVICE) as android.net.wifi.WifiManager
-                        val wifiInfo = com.ivelosi.dnc.network.WifiUtils.getWifiInfo(wifiManager)
-                        val localIP = com.ivelosi.dnc.network.WifiUtils.extractIpAddress(wifiInfo, wifiManager)
+                        val wifiManager = context.applicationContext.getSystemService(Context.WIFI_SERVICE) as WifiManager
+                        val wifiInfo = com.ivelosi.dnc.network.WifiUtils.getWifiInfo(context, wifiManager)
+                        val localIP = com.ivelosi.dnc.network.WifiUtils.extractIpAddress(context, wifiInfo, wifiManager, null)
                         
                         if (localIP.isNotEmpty()) {
                             // Send our IP address to the newly connected device
@@ -293,5 +294,20 @@ class SocketCommunicator(
                 sendMessage(MessageProtocol.TYPE_ERROR, "File transfer failed: ${e.message}")
             }
         }
+    }
+
+    /**
+     * Get current network information for diagnostics
+     */
+    fun getNetworkInfo(): String {
+        val wifiManager = context.applicationContext.getSystemService(Context.WIFI_SERVICE) as WifiManager
+        val wifiInfo = com.ivelosi.dnc.network.WifiUtils.getWifiInfo(context, wifiManager)
+        val localIP = com.ivelosi.dnc.network.WifiUtils.extractIpAddress(context, wifiInfo, wifiManager, null)
+        
+        return "Socket connection to ${deviceInfo.name}\n" +
+                "Local IP: $localIP\n" +
+                "Remote IP: ${deviceInfo.ipAddress}\n" +
+                "Connected: ${socket?.isConnected}\n" +
+                "Socket closed: ${socket?.isClosed}\n"
     }
 }

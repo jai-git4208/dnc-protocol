@@ -17,6 +17,7 @@ import com.ivelosi.dnc.signal.SocketCommunicator
 import java.net.ConnectException
 import java.net.InetAddress
 import java.net.NetworkInterface
+import android.bluetooth.BluetoothDevice
 
 class NetworkManager(private val context: Context, private val logger: NetworkLogger) {
     private val TAG = "DNCNetworkManager"
@@ -34,6 +35,9 @@ class NetworkManager(private val context: Context, private val logger: NetworkLo
     
     // Add notification manager
     private val notificationManager = DNCNotificationManager(context)
+    
+    // Add BluetoothHandshake for getting remote device IP addresses
+    private val bluetoothHandshake = BluetoothHandshake(context, logger)
 
     // Callback for received messages
     private var messageReceivedCallback: ((BluetoothDeviceInfo, String, String) -> Unit)? = null
@@ -46,8 +50,21 @@ class NetworkManager(private val context: Context, private val logger: NetworkLo
         onClientDisconnected = { device -> handleDisconnect(device) },
         onMessageReceived = { device, type, payload -> handleIncomingMessage(device, type, payload) }
     )
+    
+    // Singleton instance for the NetworkManager
+    companion object {
+        @Volatile
+        private var instance: NetworkManager? = null
+        
+        fun getInstance(context: Context): NetworkManager? {
+            return instance
+        }
+    }
 
     init {
+        // Set the singleton instance
+        instance = this
+        
         // Get local IP addresses to prevent self-connection
         collectLocalIPs()
         
@@ -142,6 +159,20 @@ class NetworkManager(private val context: Context, private val logger: NetworkLo
     }
     
     /**
+     * Use the handshake mechanism to get the remote device's IP address
+     * This is called from the WifiUtils.extractIpAddress method
+     */
+    suspend fun getRemoteDeviceIpViaHandshake(device: BluetoothDevice): String? {
+        return try {
+            logger.log("Attempting handshake with ${device.name ?: "Unknown Device"} to get IP address")
+            bluetoothHandshake.getRemoteDeviceIpAddress(device)
+        } catch (e: Exception) {
+            logger.log("Handshake failed: ${e.message}")
+            null
+        }
+    }
+    
+    /**
      * Start periodic broadcasting of our IP address so other devices can discover us
      */
     private fun startIPBroadcasting() {
@@ -150,8 +181,8 @@ class NetworkManager(private val context: Context, private val logger: NetworkLo
                 try {
                     // Broadcast our IP to all connected devices
                     val wifiManager = context.applicationContext.getSystemService(Context.WIFI_SERVICE) as WifiManager
-                    val wifiInfo = WifiUtils.getWifiInfo(wifiManager)
-                    val localIP = WifiUtils.extractIpAddress(wifiInfo, wifiManager)
+                    val wifiInfo = WifiUtils.getWifiInfo(context, wifiManager)
+                    val localIP = WifiUtils.extractIpAddress(context, wifiInfo, wifiManager, null)
                     
                     if (localIP.isNotEmpty()) {
                         broadcastIPAddress(localIP)

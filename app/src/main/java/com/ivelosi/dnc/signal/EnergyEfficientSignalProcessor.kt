@@ -148,7 +148,7 @@ class EnergyEfficientSignalProcessor(
         // Process devices in background thread
         processingScope.launch {
             try {
-                val wifiInfo = WifiUtils.getWifiInfo(wifiManager)
+                val wifiInfo = WifiUtils.getWifiInfo(context, wifiManager)
                 
                 for (device in devicesToProcess) {
                     processDeviceInternal(device, wifiInfo)
@@ -199,7 +199,7 @@ class EnergyEfficientSignalProcessor(
             logger.log("Efficiently processing device: $deviceName (${device.address})")
             
             // Extract IP from WiFi info for socket connection
-            val ipAddress = WifiUtils.extractIpAddress(wifiInfo, wifiManager)
+            val ipAddress = WifiUtils.extractIpAddress(context, wifiInfo, wifiManager, device)
             
             // Create or update cached device info
             val cachedInfo = deviceCache[deviceAddress]
